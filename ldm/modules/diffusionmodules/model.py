@@ -39,16 +39,37 @@ def Normalize(in_channels, num_groups=32):
     return torch.nn.GroupNorm(num_groups=num_groups, num_channels=in_channels, eps=1e-6, affine=True)
 
 
+class SimpleNCAModel(nn.Module):
+    def __init__(self, in_channels, out_channels, mid_channels=128, update_rate=0.1):
+        super().__init__()
+        self.update_rate = update_rate
+        self.perceive = nn.Conv2d(in_channels, mid_channels, kernel_size=3, padding=1)
+        self.update = nn.Sequential(
+            nn.ReLU(),
+            nn.Conv2d(mid_channels, out_channels, kernel_size=1)
+        )
+
+    def forward(self, x, emb=None):
+        dx = self.perceive(x)
+        if emb is not None:
+            B, C, H, W = dx.shape
+            emb = emb.view(B, -1, 1, 1).expand(B, -1, H, W)
+            dx = dx + emb
+        dx = self.update(dx)
+        return dx
+
+
 class Upsample(nn.Module):
     def __init__(self, in_channels, with_conv):
         super().__init__()
         self.with_conv = with_conv
         if self.with_conv:
-            self.conv = torch.nn.Conv2d(in_channels,
-                                        in_channels,
-                                        kernel_size=3,
-                                        stride=1,
-                                        padding=1)
+            # self.conv = torch.nn.Conv2d(in_channels,
+            #                             in_channels,
+            #                             kernel_size=3,
+            #                             stride=1,
+            #                             padding=1)
+            self.conv = SimpleNCAModel(in_channels, in_channels, mid_channels=in_channels)
 
     def forward(self, x):
         x = torch.nn.functional.interpolate(x, scale_factor=2.0, mode="nearest")
@@ -63,19 +84,19 @@ class Downsample(nn.Module):
         self.with_conv = with_conv
         if self.with_conv:
             # no asymmetric padding in torch conv, must do it ourselves
-            self.conv = torch.nn.Conv2d(in_channels,
-                                        in_channels,
-                                        kernel_size=3,
-                                        stride=2,
-                                        padding=0)
+            # self.conv = torch.nn.Conv2d(in_channels,
+            #                             in_channels,
+            #                             kernel_size=3,
+            #                             stride=2,
+            #                             padding=0)
+            self.conv = SimpleNCAModel(in_channels, in_channels, mid_channels=in_channels)
 
     def forward(self, x):
         if self.with_conv:
             pad = (0,1,0,1)
             x = torch.nn.functional.pad(x, pad, mode="constant", value=0)
             x = self.conv(x)
-        else:
-            x = torch.nn.functional.avg_pool2d(x, kernel_size=2, stride=2)
+        x = torch.nn.functional.avg_pool2d(x, kernel_size=2, stride=2)
         return x
 
 
@@ -89,21 +110,23 @@ class ResnetBlock(nn.Module):
         self.use_conv_shortcut = conv_shortcut
 
         self.norm1 = Normalize(in_channels)
-        self.conv1 = torch.nn.Conv2d(in_channels,
-                                     out_channels,
-                                     kernel_size=3,
-                                     stride=1,
-                                     padding=1)
+        # self.conv1 = torch.nn.Conv2d(in_channels,
+        #                              out_channels,
+        #                              kernel_size=3,
+        #                              stride=1,
+        #                              padding=1)
+        self.conv1 = SimpleNCAModel(in_channels, out_channels, mid_channels=out_channels)
         if temb_channels > 0:
             self.temb_proj = torch.nn.Linear(temb_channels,
                                              out_channels)
         self.norm2 = Normalize(out_channels)
         self.dropout = torch.nn.Dropout(dropout)
-        self.conv2 = torch.nn.Conv2d(out_channels,
-                                     out_channels,
-                                     kernel_size=3,
-                                     stride=1,
-                                     padding=1)
+        # self.conv2 = torch.nn.Conv2d(out_channels,
+        #                              out_channels,
+        #                              kernel_size=3,
+        #                              stride=1,
+        #                              padding=1)
+        self.conv2 = SimpleNCAModel(out_channels, out_channels, mid_channels=out_channels)
         if self.in_channels != self.out_channels:
             if self.use_conv_shortcut:
                 self.conv_shortcut = torch.nn.Conv2d(in_channels,
@@ -238,11 +261,12 @@ class Model(nn.Module):
             ])
 
         # downsampling
-        self.conv_in = torch.nn.Conv2d(in_channels,
-                                       self.ch,
-                                       kernel_size=3,
-                                       stride=1,
-                                       padding=1)
+        # self.conv_in = torch.nn.Conv2d(in_channels,
+        #                                self.ch,
+        #                                kernel_size=3,
+        #                                stride=1,
+        #                                padding=1)
+        self.conv_in = SimpleNCAModel(in_channels, self.ch, mid_channels=self.ch)
 
         curr_res = resolution
         in_ch_mult = (1,)+tuple(ch_mult)
@@ -312,6 +336,7 @@ class Model(nn.Module):
                                         kernel_size=3,
                                         stride=1,
                                         padding=1)
+        # self.conv_out = SimpleNCAModel(block_in, out_ch, mid_channels=out_ch)
 
     def forward(self, x, t=None, context=None):
         #assert x.shape[2] == x.shape[3] == self.resolution
@@ -380,11 +405,12 @@ class Encoder(nn.Module):
         self.in_channels = in_channels
 
         # downsampling
-        self.conv_in = torch.nn.Conv2d(in_channels,
-                                       self.ch,
-                                       kernel_size=3,
-                                       stride=1,
-                                       padding=1)
+        # self.conv_in = torch.nn.Conv2d(in_channels,
+        #                                self.ch,
+        #                                kernel_size=3,
+        #                                stride=1,
+        #                                padding=1)
+        self.conv_in = SimpleNCAModel(in_channels, self.ch, mid_channels=self.ch)
 
         curr_res = resolution
         in_ch_mult = (1,)+tuple(ch_mult)
@@ -425,11 +451,12 @@ class Encoder(nn.Module):
 
         # end
         self.norm_out = Normalize(block_in)
-        self.conv_out = torch.nn.Conv2d(block_in,
-                                        2*z_channels if double_z else z_channels,
-                                        kernel_size=3,
-                                        stride=1,
-                                        padding=1)
+        # self.conv_out = torch.nn.Conv2d(block_in,
+        #                                 2*z_channels if double_z else z_channels,
+        #                                 kernel_size=3,
+        #                                 stride=1,
+        #                                 padding=1)
+        self.conv_out = SimpleNCAModel(block_in, 2*z_channels if double_z else z_channels, mid_channels=2*z_channels if double_z else z_channels)
 
     def forward(self, x):
         # timestep embedding
@@ -484,11 +511,12 @@ class Decoder(nn.Module):
             self.z_shape, np.prod(self.z_shape)))
 
         # z to block_in
-        self.conv_in = torch.nn.Conv2d(z_channels,
-                                       block_in,
-                                       kernel_size=3,
-                                       stride=1,
-                                       padding=1)
+        # self.conv_in = torch.nn.Conv2d(z_channels,
+        #                                block_in,
+        #                                kernel_size=3,
+        #                                stride=1,
+        #                                padding=1)
+        self.conv_in = SimpleNCAModel(z_channels, block_in, mid_channels=block_in)
 
         # middle
         self.mid = nn.Module()
@@ -526,11 +554,12 @@ class Decoder(nn.Module):
 
         # end
         self.norm_out = Normalize(block_in)
-        self.conv_out = torch.nn.Conv2d(block_in,
-                                        out_ch,
-                                        kernel_size=3,
-                                        stride=1,
-                                        padding=1)
+        # self.conv_out = torch.nn.Conv2d(block_in,
+        #                                 out_ch,
+        #                                 kernel_size=3,
+        #                                 stride=1,
+        #                                 padding=1)
+        self.conv_out = SimpleNCAModel(block_in, out_ch, mid_channels=out_ch)
 
     def forward(self, z):
         #assert z.shape[1:] == self.z_shape[1:]
@@ -585,11 +614,12 @@ class SimpleDecoder(nn.Module):
                                      Upsample(in_channels, with_conv=True)])
         # end
         self.norm_out = Normalize(in_channels)
-        self.conv_out = torch.nn.Conv2d(in_channels,
-                                        out_channels,
-                                        kernel_size=3,
-                                        stride=1,
-                                        padding=1)
+        # self.conv_out = torch.nn.Conv2d(in_channels,
+        #                                 out_channels,
+        #                                 kernel_size=3,
+        #                                 stride=1,
+        #                                 padding=1)
+        self.conv_out = SimpleNCAModel(in_channels, out_channels, mid_channels=out_channels)
 
     def forward(self, x):
         for i, layer in enumerate(self.model):
