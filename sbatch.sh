@@ -26,8 +26,8 @@ cd /lustre/nvwulf/projects/YouGroup-nvwulf/wang159/latent-diffusion-nca
 
 echo "Job started on $(hostname) at $(date)" >> slurm_output_$SLURM_JOB_ID.txt
 
-NUM_GPUS=$(echo $CUDA_VISIBLE_DEVICES | tr ',' '\n' | wc -l)
-python main.py --base configs/latent-diffusion-nca/celebahq-ldm-vq-4.yaml -t --gpus 0,1,2,3
+NUM_GPUS=$(echo $CUDA_VISIBLE_DEVICES | tr ',   ' '\n' | wc -l)
+python main.py --base configs/latent-diffusion/celebahq-ldm-vq-4.yaml -t --gpus 0,1,2,3
 
 echo "CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES"
 echo "Detected NUM_GPUS=$NUM_GPUS"
