@@ -21,6 +21,7 @@ source ~/miniconda3/etc/profile.d/conda.sh
 conda activate ldm
 
 CKPT=/lustre/nvwulf/projects/YouGroup-nvwulf/wang159/latent-diffusion-nca/logs/2025-09-17T16-47-07_celebahq-ldm-vq-4/checkpoints/epoch=000553.ckpt
+LOGDIR=$(dirname $CKPT)/..
 OUTDIR=/lustre/nvwulf/projects/YouGroup-nvwulf/wang159/latent-diffusion-nca/outputs/fid_eval_${SLURM_JOB_ID}
 
 mkdir -p $OUTDIR
