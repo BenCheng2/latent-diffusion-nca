@@ -716,7 +716,10 @@ if __name__ == "__main__":
         # run
         if opt.train:
             try:
-                trainer.fit(model, data)
+                if opt.resume_from_checkpoint:
+                    trainer.fit(model, data, ckpt_path=opt.resume_from_checkpoint)
+                else:
+                    trainer.fit(model, data)
             except Exception:
                 melk()
                 raise
