@@ -23,6 +23,7 @@ conda activate ldm
 CKPT=/lustre/nvwulf/projects/YouGroup-nvwulf/wang159/latent-diffusion-nca/logs/2025-09-17T16-47-07_celebahq-ldm-vq-4/checkpoints/epoch=000553.ckpt
 LOGDIR=$(dirname $CKPT)/..
 OUTDIR=/lustre/nvwulf/projects/YouGroup-nvwulf/wang159/latent-diffusion-nca/outputs/fid_eval_${SLURM_JOB_ID}
+DATASET=/lustre/nvwulf/projects/YouGroup-nvwulf/wang159/data/celebahq/valid   # CelebA-HQ 真实数据路径
 
 mkdir -p $OUTDIR
 
@@ -35,17 +36,14 @@ if [ ! -f "$LOGDIR/config.yaml" ]; then
 fi
 
 # ===== Step 1: 生成样本 =====
-CUDA_VISIBLE_DEVICES=0,1,2,3 python scripts/sample_diffusion.py \
-    --resume $CKPT \
-    --n_samples 10000 \
-    --batch_size 32 \
-    --custom_steps 200 \
-    --eta 0.0 \
-    --logdir $OUTDIR
+CUDA_VISIBLE_DEVICES=0 python scripts/sample_diffusion.py --resume $CKPT --n_samples 12500 --batch_size 128 --custom_steps 200 --eta 0.0 --logdir $OUTDIR/gpu0
+CUDA_VISIBLE_DEVICES=1 python scripts/sample_diffusion.py --resume $CKPT --n_samples 12500 --batch_size 128 --custom_steps 200 --eta 0.0 --logdir $OUTDIR/gpu1
+CUDA_VISIBLE_DEVICES=2 python scripts/sample_diffusion.py --resume $CKPT --n_samples 12500 --batch_size 128 --custom_steps 200 --eta 0.0 --logdir $OUTDIR/gpu2
+CUDA_VISIBLE_DEVICES=3 python scripts/sample_diffusion.py --resume $CKPT --n_samples 12500 --batch_size 128 --custom_steps 200 --eta 0.0 --logdir $OUTDIR/gpu3
 
 # ===== Step 2: 计算 FID =====
 pip install --user pytorch-fid
-~/.local/bin/pytorch-fid $DATASET $OUTDIR/*/img >> $OUTDIR/fid_result.txt
+pytorch-fid $DATASET $OUTDIR/*/img >> $OUTDIR/fid_result.txt
 
 echo "FID result:"
 cat $OUTDIR/fid_result.txt
