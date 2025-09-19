@@ -5,7 +5,7 @@
 #SBATCH --mail-user=bben.cheng@mail.utoronto.ca
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --partition=h200x4-long
-#SBATCH --gpus=4
+#SBATCH --gpus=1
 #SBATCH --time=23:59:00
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=32
@@ -36,10 +36,7 @@ if [ ! -f "$LOGDIR/config.yaml" ]; then
 fi
 
 # ===== Step 1: 生成样本 =====
-CUDA_VISIBLE_DEVICES=0 python scripts/sample_diffusion.py --resume $CKPT --n_samples 12500 --batch_size 128 --custom_steps 200 --eta 0.0 --logdir $OUTDIR/gpu0
-CUDA_VISIBLE_DEVICES=1 python scripts/sample_diffusion.py --resume $CKPT --n_samples 12500 --batch_size 128 --custom_steps 200 --eta 0.0 --logdir $OUTDIR/gpu1
-CUDA_VISIBLE_DEVICES=2 python scripts/sample_diffusion.py --resume $CKPT --n_samples 12500 --batch_size 128 --custom_steps 200 --eta 0.0 --logdir $OUTDIR/gpu2
-CUDA_VISIBLE_DEVICES=3 python scripts/sample_diffusion.py --resume $CKPT --n_samples 12500 --batch_size 128 --custom_steps 200 --eta 0.0 --logdir $OUTDIR/gpu3
+CUDA_VISIBLE_DEVICES=0 python scripts/sample_diffusion.py --resume $CKPT --n_samples 12500 --batch_size 160 --custom_steps 200 --eta 0.0 --logdir $OUTDIR/gpu0
 
 # ===== Step 2: 计算 FID =====
 pip install --user pytorch-fid
